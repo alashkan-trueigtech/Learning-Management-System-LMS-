@@ -1,169 +1,126 @@
-
 # Learning Management System (LMS) Backend
 
-A backend application for managing an online learning platform. It supports administrators, instructors, and students with role-based access control.
+Backend application for an online learning platform with Admin, Instructor, and Student roles.
 
 ## Tech Stack
-
-- Node.js
-- Express.js
+- Node.js and Express.js
 - PostgreSQL
 - Sequelize ORM
 - JWT Authentication
 - AJV Validation
-- Redis
-- Docker & Docker Compose
+- Redis Caching
+- Docker and Docker Compose
 
-## Main Features
-
-- User registration and login
-- JWT-based authentication
-- Role-based access control (Admin, Instructor, Student)
-- Category management
-- Course management
-- Instructor assignment to courses
-- Lesson management
-- Student course enrollment
-- Lesson progress tracking
+## Features
+- User registration, login, logout, and token management
+- Role-based access control
+- Category and course management
+- Instructor assignment
+- Lesson management and preview access
+- Student enrollment
+- Lesson progress tracking and course completion
 - Course reviews and ratings
-- Role-based dashboards
-- Pagination and filtering
+- Admin, Instructor, and Student dashboards
+- Pagination, filtering, and sorting
 - Centralized error handling
-
-## Project Structure
-
-```text
-lms-backend/
-├── config/
-├── errors/
-├── middleware/
-├── models/
-├── modules/
-│   ├── auth/
-│   ├── categories/
-│   ├── courses/
-│   ├── dashboard/
-│   ├── enrollments/
-│   ├── lessons/
-│   ├── progress/
-│   ├── reviews/
-│   └── users/
-├── utils/
-├── app.js
-├── server.js
-├── Dockerfile
-├── docker-compose.yml
-└── package.json
-```
+- Redis course-list caching
 
 ## Local Setup
 
-### 1. Clone the repository
+1. Install dependencies:
 
-```bash
-git clone <YOUR_REPOSITORY_URL>
-cd lms-backend
-```
+   npm install
 
-### 2. Install dependencies
+2. Create `.env` using `.env.example` as reference.
 
-```bash
-npm install
-```
+3. Configure PostgreSQL, JWT_SECRET, and REDIS_URL.
 
-### 3. Configure environment
+4. Run migrations:
 
-Create a `.env` file using `.env.example` as a reference.
+   npm run db:migrate
 
-Set your PostgreSQL database credentials and JWT secret.
+5. Insert initial categories:
 
-### 4. Start the application
+   npm run db:seed
 
-```bash
-npm run dev
-```
+6. Start the server:
 
-The backend runs at:
+   npm run dev
 
-`http://localhost:5000`
+Backend URL: http://localhost:5000
 
 ## Docker Setup
 
-Build and start the containers:
+Start services:
 
-```bash
-sudo docker compose up --build -d
-```
+   sudo docker compose up --build -d
 
-Check container status:
+Check containers:
 
-```bash
-sudo docker compose ps
-```
+   sudo docker compose ps
 
-View backend logs:
+Run category seeder:
 
-```bash
-sudo docker compose logs app
-```
+   sudo docker compose exec app npm run db:seed
+
+View logs:
+
+   sudo docker compose logs app
 
 Stop containers:
 
-```bash
-sudo docker compose down
-```
+   sudo docker compose down
 
-## Docker Services
+## Docker Ports
 
-| Service | Port |
-|---|---:|
-| LMS Backend | 5000 |
-| PostgreSQL | 5434 |
-| Redis | 6380 |
+- Backend: 5000
+- PostgreSQL: 5434
+- Redis: 6380
 
 ## API Base URL
 
-`http://localhost:5000/api`
+http://localhost:5000/api
 
-API modules include:
+## API Modules
 
-- `/auth`
-- `/categories`
-- `/users`
-- `/courses`
-- `/lessons`
-- `/enrollments`
-- `/progress`
-- `/reviews`
-- `/dashboard`
+- /auth
+- /categories
+- /users
+- /courses
+- /lessons
+- /enrollments
+- /progress
+- /reviews
+- /dashboard
+
+Use Postman for API testing.
 
 ## User Roles
 
-- **Admin:** Manages users, categories, courses, and platform operations.
-- **Instructor:** Manages assigned courses and lessons.
-- **Student:** Enrolls in courses, accesses lessons, tracks progress, and submits reviews.
+- Admin: Manages users, categories, courses, and platform operations.
+- Instructor: Manages assigned courses and lessons.
+- Student: Enrolls in courses, accesses lessons, tracks progress, and submits reviews.
+
+## Database
+
+PostgreSQL is managed through Sequelize models, associations, and migrations.
+
+- npm run db:migrate
+- npm run db:seed
+
+The application currently synchronizes Sequelize models during startup.
 
 ## Security
 
 - Password hashing
 - JWT authentication
 - Role-based authorization
-- Request validation using AJV
+- AJV request validation
 - Environment-based configuration
 - Centralized error handling
-
-## Database
-
-The application uses PostgreSQL with Sequelize models and associations. Database tables are synchronized during application startup.
-
-## Development
-
-```bash
-npm run dev
-```
 
 ## Important
 
 - Never commit `.env` or expose database credentials.
-- Configure a strong JWT secret before deployment.
-- API requests can be tested using Postman.
+- Use a strong, unique JWT secret before deployment.
+- Never commit node_modules.

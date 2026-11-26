@@ -1,6 +1,11 @@
 const { Op } = require("sequelize");
 const sequelize = require("../../config/database");
-
+const {
+    getCache,
+    setCache,
+    getCacheVersion,
+    invalidateCourseCache,
+} = require("../../utils/cache");
 const {
     Course,
     Category,
@@ -12,6 +17,7 @@ const {
 } = require("../../models");
 
 const AppError = require("../../errors/AppError");
+
 
 // Generate URL-friendly slug
 const generateSlug = (title) => {
@@ -39,7 +45,7 @@ const createUniqueSlug = async (title) => {
 
 // CREATE COURSE
 const createCourse = async (courseData, user) => {
-    return await sequelize.transaction(async (transaction) => {
+    const course = await sequelize.transaction(async (transaction) => {
         const title = courseData.title.trim();
 
         const category = await Category.findByPk(
@@ -87,10 +93,13 @@ const createCourse = async (courseData, user) => {
 
         return course;
     });
+
+    await invalidateCourseCache();
+    return course;
 };
 
 
-// GET ALL COURSES
+
 const getAllCourses = async (query, user) => {
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
 
@@ -100,34 +109,28 @@ const getAllCourses = async (query, user) => {
     );
 
     const offset = (page - 1) * limit;
-
     const where = {};
 
-    // Students can see only published courses
     if (user.role === "student") {
         where.status = "published";
     } else if (query.status) {
         where.status = query.status;
     }
 
-    // Search by course title
     if (query.search) {
         where.title = {
             [Op.iLike]: `%${query.search.trim()}%`,
         };
     }
 
-    // Filter by category
     if (query.categoryId) {
         where.categoryId = query.categoryId;
     }
 
-    // Filter by course level
     if (query.level) {
         where.level = query.level;
     }
 
-    // Course sorting options
     const sortOptions = {
         newest: [["createdAt", "DESC"]],
         oldest: [["createdAt", "ASC"]],
@@ -138,30 +141,49 @@ const getAllCourses = async (query, user) => {
 
     const order = sortOptions[query.sort] || sortOptions.newest;
 
+    const cacheVersion = await getCacheVersion();
+
+    const cacheKey = `courses:${cacheVersion}:student:${JSON.stringify({
+        page,
+        limit,
+        search: query.search || "",
+        categoryId: query.categoryId || "",
+        level: query.level || "",
+        sort: query.sort || "newest",
+    })}`;
+
+    if (user.role === "student") {
+        const cachedCourses = await getCache(cacheKey);
+
+        if (cachedCourses) {
+            return cachedCourses;
+        }
+    }
+
     const { count, rows } = await Course.findAndCountAll({
         where,
-   include: [
-    {
-        model: Category,
-        as: "category",
-        attributes: ["id", "name", "slug"],
-    },
-    {
-        model: User,
-        as: "instructors",
-        attributes: ["id", "firstName", "lastName", "email"],
-        through: {
-            attributes: ["isPrimary"],
-        },
-    },
-],
+        include: [
+            {
+                model: Category,
+                as: "category",
+                attributes: ["id", "name", "slug"],
+            },
+            {
+                model: User,
+                as: "instructors",
+                attributes: ["id", "firstName", "lastName", "email"],
+                through: {
+                    attributes: ["isPrimary"],
+                },
+            },
+        ],
         limit,
         offset,
         order,
         distinct: true,
     });
 
-    return {
+    const result = {
         courses: rows,
         pagination: {
             totalItems: count,
@@ -170,6 +192,12 @@ const getAllCourses = async (query, user) => {
             pageSize: limit,
         },
     };
+
+    if (user.role === "student") {
+        await setCache(cacheKey, result, 60);
+    }
+
+    return result;
 };
 
 
@@ -269,6 +297,7 @@ const updateCourse = async (courseId, courseData, user) => {
     }
 
     await course.update(updateData);
+    await invalidateCourseCache();
 
     return course;
 };
@@ -276,7 +305,7 @@ const updateCourse = async (courseId, courseData, user) => {
 
 // DELETE COURSE
 const deleteCourse = async (courseId, user) => {
-    return await sequelize.transaction(async (transaction) => {
+    const result = await sequelize.transaction(async (transaction) => {
         const course = await Course.findByPk(courseId, {
             transaction,
         });
@@ -342,6 +371,9 @@ const deleteCourse = async (courseId, user) => {
 
         return true;
     });
+
+    await invalidateCourseCache();
+    return result;
 };
 
 
@@ -399,6 +431,7 @@ const updateCourseStatus = async (courseId, status, user) => {
     }
 
     await course.update({ status });
+    await invalidateCourseCache();
 
     return course;
 };
@@ -406,7 +439,7 @@ const updateCourseStatus = async (courseId, status, user) => {
 
 // ASSIGN INSTRUCTOR TO COURSE
 const assignInstructor = async (courseId, instructorId, isPrimary = false) => {
-    return await sequelize.transaction(async (transaction) => {
+    const result = await sequelize.transaction(async (transaction) => {
         const course = await Course.findByPk(courseId, { transaction });
 
         if (!course) {
@@ -457,12 +490,15 @@ const assignInstructor = async (courseId, instructorId, isPrimary = false) => {
 
         return assignment;
     });
+
+    await invalidateCourseCache();
+    return result;
 };
 
 
 // REMOVE INSTRUCTOR FROM COURSE
 const removeInstructor = async (courseId, instructorId) => {
-    return await sequelize.transaction(async (transaction) => {
+    const result = await sequelize.transaction(async (transaction) => {
         const course = await Course.findByPk(courseId, { transaction });
 
         if (!course) {
@@ -506,6 +542,9 @@ const removeInstructor = async (courseId, instructorId) => {
 
         return true;
     });
+
+    await invalidateCourseCache();
+    return result;
 };
 
 

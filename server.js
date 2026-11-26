@@ -2,7 +2,9 @@
 require("dotenv").config();
 
 const app = require("./app");
+
 const sequelize = require("./config/database");
+const { connectRedis } = require("./config/redis");
 require("./models");
 
 const PORT = process.env.PORT || 5000;
@@ -14,6 +16,7 @@ const startServer = async () => {
 
         await sequelize.sync();
         console.log("All models synchronized successfully!");
+await connectRedis();
 
         app.listen(PORT, () => {
             console.log(`LMS Server running on port ${PORT}`);
