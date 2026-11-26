@@ -124,3 +124,36 @@ The application currently synchronizes Sequelize models during startup.
 - Never commit `.env` or expose database credentials.
 - Use a strong, unique JWT secret before deployment.
 - Never commit node_modules.
+
+## Environment Configuration
+
+Before starting the application, configure the required variables in `.env`.
+Use `.env.example` as a reference. Never commit `.env` to Git.
+
+For Docker Compose, the application connects to PostgreSQL and Redis using
+their service names (`db` and `redis`) inside the Docker network.
+
+## Database Setup Notes
+
+For a fresh database, run migrations and seeders before using the APIs.
+
+Local environment:
+
+    npm run db:migrate
+    npm run db:seed
+
+Docker environment:
+
+    sudo docker compose exec app npm run db:migrate
+    sudo docker compose exec app npm run db:seed
+
+The application also synchronizes Sequelize models during startup.
+Migrations should still be maintained as the schema versioning mechanism.
+
+## Production Deployment Notes
+
+- Replace development credentials with strong, unique secrets.
+- Use a strong JWT secret.
+- Do not expose PostgreSQL or Redis ports publicly unless required.
+- Configure HTTPS and production CORS restrictions.
+- Review database backups and recovery procedures.
