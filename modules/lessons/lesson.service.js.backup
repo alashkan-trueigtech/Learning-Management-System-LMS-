@@ -1,0 +1,177 @@
+const {
+    Course,
+    Lesson,
+    CourseInstructor,
+    LessonProgress,
+} = require("../../models");
+
+const AppError = require("../../errors/AppError");
+
+// CHECK COURSE ACCESS
+const checkCourseAccess = async (courseId, user, write = false) => {
+    const course = await Course.findByPk(courseId);
+
+    if (!course) {
+        throw new AppError("Course not found", 404);
+    }
+
+    // Admin has full access
+    if (user.role === "admin") {
+        return course;
+    }
+
+    // Check instructor assignment
+    if (user.role === "instructor") {
+        const assignment = await CourseInstructor.findOne({
+            where: {
+                courseId: course.id,
+                instructorId: user.id,
+            },
+        });
+
+        if (!assignment) {
+            throw new AppError(
+                "You can only access your assigned courses",
+                403
+            );
+        }
+
+        return course;
+    }
+
+    // Students can only read published courses
+    if (user.role === "student" && !write) {
+        if (course.status !== "published") {
+            throw new AppError("Course not found", 404);
+        }
+
+        return course;
+    }
+
+    throw new AppError("You do not have permission", 403);
+};
+
+
+// CREATE LESSON
+const createLesson = async (courseId, lessonData, user) => {
+    await checkCourseAccess(courseId, user, true);
+
+    const data = {
+        ...lessonData,
+        title: lessonData.title.trim(),
+        courseId,
+    };
+
+    return await Lesson.create(data);
+};
+
+
+// GET ALL LESSONS
+const getAllLessons = async (courseId, user) => {
+    await checkCourseAccess(courseId, user);
+
+    const where = { courseId };
+
+    if (user.role === "student") {
+        where.isPublished = true;
+    }
+
+    return await Lesson.findAll({
+        where,
+        order: [
+            ["position", "ASC"],
+            ["createdAt", "ASC"],
+        ],
+    });
+};
+
+
+// GET LESSON BY ID
+const getLessonById = async (courseId, lessonId, user) => {
+    await checkCourseAccess(courseId, user);
+
+    const where = {
+        id: lessonId,
+        courseId,
+    };
+
+    if (user.role === "student") {
+        where.isPublished = true;
+    }
+
+    const lesson = await Lesson.findOne({ where });
+
+    if (!lesson) {
+        throw new AppError("Lesson not found", 404);
+    }
+
+    return lesson;
+};
+
+
+// UPDATE LESSON
+const updateLesson = async (courseId, lessonId, lessonData, user) => {
+    await checkCourseAccess(courseId, user, true);
+
+    const lesson = await Lesson.findOne({
+        where: {
+            id: lessonId,
+            courseId,
+        },
+    });
+
+    if (!lesson) {
+        throw new AppError("Lesson not found", 404);
+    }
+
+    const updateData = { ...lessonData };
+
+    if (updateData.title !== undefined) {
+        updateData.title = updateData.title.trim();
+    }
+
+    await lesson.update(updateData);
+
+    return lesson;
+};
+
+
+// DELETE LESSON
+const deleteLesson = async (courseId, lessonId, user) => {
+    await checkCourseAccess(courseId, user, true);
+
+    const lesson = await Lesson.findOne({
+        where: {
+            id: lessonId,
+            courseId,
+        },
+    });
+
+    if (!lesson) {
+        throw new AppError("Lesson not found", 404);
+    }
+
+    const progressCount = await LessonProgress.count({
+        where: { lessonId },
+    });
+
+    if (progressCount > 0) {
+        throw new AppError(
+            "Cannot delete a lesson with existing student progress",
+            409
+        );
+    }
+
+    await lesson.destroy();
+
+    return true;
+};
+
+
+module.exports = {
+    createLesson,
+    getAllLessons,
+    getLessonById,
+    updateLesson,
+    deleteLesson,
+};
